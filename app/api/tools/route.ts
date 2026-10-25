@@ -1,3 +1,4 @@
+import {requireAuth} from '../../../lib/auth';
 import {execFile} from 'node:child_process';
 import {isIP,createConnection} from 'node:net';
 import {reverse} from 'node:dns/promises';
@@ -5,6 +6,7 @@ export const runtime='nodejs';
 export const dynamic='force-dynamic';
 let running=0;
 export async function POST(req:Request){
+ const denied=requireAuth(req);if(denied)return denied;
  let input;
  try{input=await req.json() as {action:string;ip:string;port?:number};}catch{return Response.json({error:'Некорректный запрос'},{status:400});}
  if(!input||typeof input.ip!=='string'||!isIP(input.ip)||!['ping','dns','tcp'].includes(input.action))return Response.json({error:'Укажите корректный IPv4 или IPv6 устройства'},{status:400});

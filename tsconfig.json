@@ -40,7 +40,9 @@
     "next.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "lib/**/*.mjs"
+    "lib/**/*.mjs",
+    "components/**/*.tsx",
+    "lib/**/*.ts"
   ],
   "exclude": [
     "node_modules"

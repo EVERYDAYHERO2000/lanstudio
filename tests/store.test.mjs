@@ -13,7 +13,7 @@ test('persists topology after reopening and rejects stale writers',()=>{
     assert.equal(store.read(),null);
     assert.deepEqual(store.save(graph),{revision:1});
     store.close();store=openStore(path);
-    assert.deepEqual(store.read(),{...graph,revision:1});
+    assert.deepEqual(store.read(),{...graph,description:'',revision:1});
     assert.throws(()=>store.save(graph),{code:'CONFLICT'});
     assert.deepEqual(store.save({...graph,revision:1,name:'Updated'}),{revision:2});
     assert.equal(store.read().name,'Updated');

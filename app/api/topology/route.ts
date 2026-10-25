@@ -1,20 +1,25 @@
+import {requireAuth} from '../../../lib/auth';
 import {validPortTypes,validPortSides} from '../../../lib/ports.mjs';
 import {validDeviceType} from '../../../lib/device-types.mjs';
 import { normalizeRouterMode } from '../../../lib/router-mode.mjs';
 import { getStore } from '../../../db';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export async function GET() {
-  try { return Response.json(getStore().read(), {headers:{'Cache-Control':'no-store'}}); }
+export async function GET(req:Request) {
+  const denied=requireAuth(req);if(denied)return denied;
+  try { return Response.json(getStore().read(new URL(req.url).searchParams.get('id')||'main'), {headers:{'Cache-Control':'no-store'}}); }
   catch (error) { console.error('Database read failed', error); return Response.json({error:'База данных недоступна'},{status:500}); }
 }
 export async function PUT(req: Request) {
+  const denied=requireAuth(req);if(denied)return denied;
   let data;
   try {
     const body = await req.text();
     if (Buffer.byteLength(body) > 5_000_000) return Response.json({error:'Схема больше 5 МБ'},{status:413});
     data = JSON.parse(body);
     if (data?.schemaVersion !== 1 || typeof data.name !== 'string' || !Array.isArray(data.nodes) || !Array.isArray(data.links)) throw Error();
+    if(data.description!==undefined&&(typeof data.description!=='string'||data.description.length>10000))throw Error();
+    if(!data.name.trim()||data.name.length>200)throw Error();
     const ids = new Set();
     data.nodes=data.nodes.map((n:any)=>n?normalizeRouterMode(n):n);
     for (const n of data.nodes) {
@@ -34,8 +39,9 @@ export async function PUT(req: Request) {
       links.add(l.id);
     }
   } catch { return Response.json({error:'Некорректная схема'},{status:400}); }
-  try { return Response.json(getStore().save(data)); }
+  try { return Response.json(getStore().save(data,new URL(req.url).searchParams.get('id')||'main')); }
   catch (error) {
+    if ((error as {code?:string}).code==='NOT_FOUND')return Response.json({error:'Схема удалена'},{status:404});
     if ((error as {code?:string}).code==='CONFLICT') return Response.json({error:(error as Error).message},{status:409});
     console.error('Database write failed',error); return Response.json({error:'Не удалось сохранить схему'},{status:500});
   }
