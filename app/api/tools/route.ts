@@ -1,3 +1,4 @@
+import {classifyPing} from '../../../lib/ping-classify.mjs';
 import {requireAuth} from '../../../lib/auth';
 import {execFile} from 'node:child_process';
 import {isIP,createConnection} from 'node:net';
@@ -14,12 +15,12 @@ export async function POST(req:Request){
  if(running>=4)return Response.json({error:'Уже выполняются проверки. Повторите позже.'},{status:429});
  running++;const started=Date.now();
  try{
-  let output:string,ok=true;
+  let output:string,ok=true,pingStatus:string|undefined;
   if(input.action==='ping'){
    const args=process.platform==='win32'?['-n','3','-w','1000',input.ip]:['-n','-c','3',...(process.platform==='darwin'?['-W','1000']:['-W','1']),input.ip];
    const executable=process.platform==='darwin'&&isIP(input.ip)===6?'ping6':'ping';
-   const result=await new Promise<{ok:boolean;output:string}>((resolve)=>execFile(executable,args,{timeout:7000,maxBuffer:65536,env:{...process.env,LC_ALL:'C'}},(error,stdout,stderr)=>resolve({ok:!error,output:((error as NodeJS.ErrnoException)?.code==='ENOENT'?'Утилита ping не установлена на сервере. Linux: установите iputils-ping.':stdout+'\n'+stderr+(error&&!stdout&&!stderr?'Проверка завершилась ошибкой или по таймауту.':'' )).trim()})));
-   output=result.output;ok=result.ok;
+   const result=await new Promise<{ok:boolean;output:string;status:string}>((resolve)=>execFile(executable,args,{timeout:7000,maxBuffer:65536,env:{...process.env,LC_ALL:'C'}},(error,stdout,stderr)=>resolve({ok:!error,status:classifyPing(error,stdout+'\n'+stderr),output:((error as NodeJS.ErrnoException)?.code==='ENOENT'?'Утилита ping не установлена на сервере. Linux: установите iputils-ping.':stdout+'\n'+stderr+(error&&!stdout&&!stderr?'Проверка завершилась ошибкой или по таймауту.':'' )).trim()})));
+   output=result.output;ok=result.ok;pingStatus=result.status;
   }else if(input.action==='dns'){
    let timer:ReturnType<typeof setTimeout>|undefined;
    try{const names=await Promise.race([reverse(input.ip),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('DNS: превышено время ожидания')),4000);})]);output=names.length?names.join('\n'):'PTR-запись не найдена';ok=names.length>0;}finally{clearTimeout(timer);}
@@ -27,6 +28,6 @@ export async function POST(req:Request){
    const result=await new Promise<{ok:boolean;output:string}>(resolve=>{const socket=createConnection({host:input.ip,port:input.port!,timeout:3000});let done=false;const finish=(ok:boolean,output:string)=>{if(done)return;done=true;socket.destroy();resolve({ok,output});};socket.once('connect',()=>finish(true,`TCP ${input.ip}:${input.port} — соединение установлено`));socket.once('timeout',()=>finish(false,'TCP: время ожидания истекло (3 с)'));socket.once('error',e=>finish(false,`TCP: ${(e as NodeJS.ErrnoException).code??e.message}`));});
    output=result.output;ok=result.ok;
   }
-  return Response.json({ok,output,durationMs:Date.now()-started});
+  return Response.json({ok,output,...(pingStatus?{pingStatus}:{}),durationMs:Date.now()-started});
  }catch(e){return Response.json({ok:false,output:(e as Error).message,durationMs:Date.now()-started});}finally{running--;}
 }
