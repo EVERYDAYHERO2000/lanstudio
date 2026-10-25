@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import {randomBytes,randomUUID,scryptSync,timingSafeEqual,createHash} from 'node:crypto';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 export function openStore(filename = process.env.DATABASE_PATH || './data/lan-studio.sqlite') {
- if(filename!==':memory:')mkdirSync(dirname(resolve(filename)),{recursive:true});
+ if(filename!==':memory:')mkdirSync(dirname(resolve(/* turbopackIgnore: true */ filename)),{recursive:true});
  const db=new DatabaseSync(filename);db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
  db.exec(`CREATE TABLE IF NOT EXISTS topologies(id TEXT PRIMARY KEY,data TEXT NOT NULL,revision INTEGER NOT NULL,updated_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS account(id INTEGER PRIMARY KEY CHECK(id=1),salt TEXT NOT NULL,password_hash TEXT NOT NULL,failures INTEGER NOT NULL DEFAULT 0,blocked_until INTEGER NOT NULL DEFAULT 0);
