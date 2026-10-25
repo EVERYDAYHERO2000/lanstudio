@@ -1,0 +1,30 @@
+[Unit]
+Description=LAN Studio network topology editor
+After=network.target
+
+[Service]
+Type=simple
+User=lan-studio
+Group=lan-studio
+WorkingDirectory=/opt/lan-studio/current
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+Environment=DATABASE_PATH=/var/lib/lan-studio/lan-studio.sqlite
+EnvironmentFile=-/etc/lan-studio.env
+ExecStart=@NODE_BIN@ /opt/lan-studio/current/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+StateDirectory=lan-studio
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lan-studio
+
+[Install]
+WantedBy=multi-user.target
