@@ -34,3 +34,11 @@ test('networks and router options survive SQLite reopen',()=>{
  const dir=mkdtempSync(join(tmpdir(),'lan-options-'));let store=openStore(join(dir,'test.sqlite'));
  try{store.save(validateOptions(graph));store.close();store=openStore(join(dir,'test.sqlite'));const saved=store.read();assert.deepEqual(saved.networks,graph.networks);assert.deepEqual(saved.nodes,graph.nodes);validateOptions(saved);}finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('router SSIDs create independent right-side points and survive persistence',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'lan-wifi-'));let store=openStore(join(dir,'test.sqlite'));
+ const node={id:'router',type:'router',meshEnabled:false,ports:['wan','wifi1','wifi2'],portTypes:{wifi1:'wifi',wifi2:'wifi'},portSides:{wifi1:'left'},portRoles:{wifi1:'wan'},wifiNetworks:{wifi1:'Home Wi-Fi',wifi2:'Guest'}};
+ const data={schemaVersion:1,name:'Wi-Fi',nodes:[node],links:[]};
+ try{assert.equal(portPosition(node,'wifi1').left,false);assert.equal(portPosition(node,'wifi2').left,false);assert.notEqual(portPosition(node,'wifi1').y,portPosition(node,'wifi2').y);assert.equal(validPortTypes(node),true);validateOptions(data);store.save(data);store.close();store=openStore(join(dir,'test.sqlite'));assert.deepEqual(store.read().nodes[0].wifiNetworks,node.wifiNetworks);validateOptions(store.read());
+ for(const wifiNetworks of [{wifi1:''},{wifi1:'Home',missing:'Guest'},{wifi1:123},{wifi1:'Home'}])assert.throws(()=>validateOptions({...data,nodes:[{...node,wifiNetworks}]}));
+ }finally{store.close();rmSync(dir,{recursive:true,force:true});}
+});

@@ -1,0 +1,10 @@
+'use client';
+import {useState} from 'react';
+import {Plus,Trash2,Wifi} from 'lucide-react';
+type WifiNode={ports:string[];portTypes?:Record<string,string>;portRoles?:Record<string,string>;portSides?:Record<string,string>;wifiNetworks?:Record<string,string>};
+export function RouterWifi({node,usedPorts,patch}:{node:WifiNode;usedPorts:string[];patch:(value:any)=>void}){
+ const [ssid,setSsid]=useState('');
+ return <div className="router-wifi"><div className="section-label">WI-FI СЕТИ</div>
+ {Object.entries(node.wifiNetworks??{}).map(([port,name])=><div className="wifi-network" key={port}><Wifi size={14}/><label className="field">SSID<input aria-label={`SSID ${port}`} maxLength={100} value={name} onChange={e=>patch({wifiNetworks:{...node.wifiNetworks,[port]:e.target.value}})}/></label><button title={usedPorts.includes(port)?'Сначала отключите связи Wi-Fi-сети':'Удалить Wi-Fi-сеть'} disabled={usedPorts.includes(port)} onClick={()=>patch({ports:node.ports.filter(p=>p!==port),...(node.portRoles?{portRoles:Object.fromEntries(Object.entries(node.portRoles).filter(([p])=>p!==port))}:{}),...(node.portSides?{portSides:Object.fromEntries(Object.entries(node.portSides).filter(([p])=>p!==port))}:{}),portTypes:Object.fromEntries(Object.entries(node.portTypes??{}).filter(([p])=>p!==port)),wifiNetworks:Object.fromEntries(Object.entries(node.wifiNetworks??{}).filter(([p])=>p!==port))})}><Trash2 size={14}/></button></div>)}
+ <form onSubmit={e=>{e.preventDefault();if(!ssid.trim())return;let i=1;while(node.ports.includes('wifi'+i))i++;const port='wifi'+i;patch({ports:[...node.ports,port],portTypes:{...node.portTypes,[port]:'wifi'},wifiNetworks:{...node.wifiNetworks,[port]:ssid.trim()}});setSsid('');}}><label className="field">Новая сеть (SSID)<input aria-label="Новая Wi-Fi-сеть" maxLength={100} value={ssid} onChange={e=>setSsid(e.target.value)} placeholder="Home Wi-Fi"/></label><button className="add-port" disabled={!ssid.trim()}><Plus size={14}/>Добавить Wi-Fi-сеть</button></form><small className="input-note">Каждая сеть создаёт точку справа. Подключайте к ней несколько устройств перетягиванием.</small></div>;
+}
