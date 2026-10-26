@@ -1,3 +1,4 @@
+import {validateOptions} from '../../../lib/topology-options.mjs';
 import {requireAuth} from '../../../lib/auth';
 import {validPortTypes,validPortSides} from '../../../lib/ports.mjs';
 import {validDeviceType} from '../../../lib/device-types.mjs';
@@ -34,10 +35,11 @@ export async function PUT(req: Request) {
     const links = new Set();
     for (const l of data.links) {
       const a=data.nodes.find((n:{id:string})=>n.id===l.source), b=data.nodes.find((n:{id:string})=>n.id===l.target);
-      if (!l.id || links.has(l.id) || !a || !b || a===b || !a.ports.includes(l.sourcePort) || !b.ports.includes(l.targetPort) || !['ethernet','wireless','usb','virtual'].includes(l.kind)) throw Error();
+      if (!l.id || links.has(l.id) || !a || !b || a===b || !a.ports.includes(l.sourcePort) || !b.ports.includes(l.targetPort) || !['ethernet','wireless','usb','virtual','vpn'].includes(l.kind)) throw Error();
       if(l.comment!==undefined&&typeof l.comment!=='string') throw Error();
       links.add(l.id);
     }
+    validateOptions(data);
   } catch { return Response.json({error:'Некорректная схема'},{status:400}); }
   try { return Response.json(getStore().save(data,new URL(req.url).searchParams.get('id')||'main')); }
   catch (error) {
