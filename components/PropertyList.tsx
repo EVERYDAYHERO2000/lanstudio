@@ -1,0 +1,3 @@
+import type {ReactNode} from 'react';
+import {Plus} from 'lucide-react';
+export function PropertyList({title,count,children,onAdd,addLabel,disabled=false,note}:{title:string;count:number;children:ReactNode;onAdd:()=>void;addLabel:string;disabled?:boolean;note?:string}){return <section className="property-list"><div className="section-label">{title} <span>{count}</span></div><div className="ports-list property-rows">{children}</div><button className="add-port" disabled={disabled} onClick={onAdd}><Plus size={14}/>{addLabel}</button>{note&&<small className="input-note">{note}</small>}</section>;}
