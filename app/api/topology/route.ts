@@ -1,3 +1,4 @@
+import {normalizeWifiGraph} from '../../../lib/wifi-catalog.mjs';
 import {validateOptions} from '../../../lib/topology-options.mjs';
 import {requireAuth} from '../../../lib/auth';
 import {validPortTypes,validPortSides} from '../../../lib/ports.mjs';
@@ -22,7 +23,7 @@ export async function PUT(req: Request) {
     if(data.description!==undefined&&(typeof data.description!=='string'||data.description.length>10000))throw Error();
     if(!data.name.trim()||data.name.length>200)throw Error();
     const ids = new Set();
-    data.nodes=data.nodes.map((n:any)=>n?normalizeNode(n):n);
+    data.nodes=data.nodes.map((n:any)=>n?normalizeNode(n):n);data=normalizeWifiGraph(data);
     for (const n of data.nodes) {
       if (!n || typeof n.id !== 'string' || ids.has(n.id) || !Number.isFinite(n.x) || !Number.isFinite(n.y) || !Array.isArray(n.ports) || n.ports.some((p:unknown)=>typeof p!=='string'||!p) || new Set(n.ports).size!==n.ports.length || ['name','model','ip','mac','description'].some(k=>typeof n[k]!=='string') || !['provider','router','switch','modem','device','container'].includes(n.type)) throw Error();
       if(!validPortSides(n)) throw Error();
