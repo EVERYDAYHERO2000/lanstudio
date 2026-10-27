@@ -30,3 +30,5 @@
 .property-rows .wifi-profile-select{flex:1;min-width:0;width:0}.wifi-editor-table tr:has(.wifi-radio[open])>td{vertical-align:top}
 
 .field select{height:34px;min-height:34px;padding-top:0;padding-bottom:0}.ports-list input:not([type=checkbox]),.ports-list select{height:34px;min-height:34px}.wifi-editor-table input:not([type=checkbox]),.wifi-editor-table select,.places-table .place-name{height:34px;min-height:34px}
+
+.edge text.edge-network{font-size:9px;fill:var(--text)}.edge text.edge-kind{font-size:8px;fill:var(--muted)}
