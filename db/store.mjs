@@ -9,13 +9,31 @@ export function openStore(filename = process.env.DATABASE_PATH || './data/lan-st
  if(filename!==':memory:')mkdirSync(dirname(resolve(/* turbopackIgnore: true */ filename)),{recursive:true});
  const db=new DatabaseSync(filename);db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
  db.exec(`CREATE TABLE IF NOT EXISTS topologies(id TEXT PRIMARY KEY,data TEXT NOT NULL,revision INTEGER NOT NULL,updated_at TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS network_workspace(id INTEGER PRIMARY KEY CHECK(id=1),topology_id TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS topology_versions(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,label TEXT NOT NULL,data TEXT NOT NULL,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS account(id INTEGER PRIMARY KEY CHECK(id=1),salt TEXT NOT NULL,password_hash TEXT NOT NULL,failures INTEGER NOT NULL DEFAULT 0,blocked_until INTEGER NOT NULL DEFAULT 0);
  CREATE TABLE IF NOT EXISTS deleted_topologies(id TEXT PRIMARY KEY);
  CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,expires_at INTEGER NOT NULL);`);
  if(!db.prepare('SELECT id FROM account WHERE id=1').get()){const salt=randomBytes(16).toString('hex');db.prepare('INSERT OR IGNORE INTO account(id,salt,password_hash) VALUES(1,?,?)').run(salt,scryptSync('admin',salt,64).toString('hex'));}
  function passwordMatches(password){const a=db.prepare('SELECT * FROM account WHERE id=1').get();return timingSafeEqual(scryptSync(password,a.salt,64),Buffer.from(a.password_hash,'hex'));}
  function session(){const token=randomBytes(32).toString('hex');db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());db.prepare('INSERT INTO sessions VALUES(?,?)').run(digest(token),Date.now()+7*86400000);return token;}
+ function currentId(){
+  const existing=db.prepare('SELECT topology_id FROM network_workspace WHERE id=1').get();if(existing)return String(existing.topology_id);
+  db.exec('BEGIN IMMEDIATE');try{const again=db.prepare('SELECT topology_id FROM network_workspace WHERE id=1').get();if(again){db.exec('COMMIT');return String(again.topology_id);}
+   let rows=db.prepare("SELECT * FROM topologies ORDER BY CASE WHEN id='main' THEN 0 ELSE 1 END,updated_at DESC,id").all();
+   if(!rows.length){const data={schemaVersion:1,name:'Моя сеть',description:'',nodes:[],links:[],networks:[],places:[],wifiProfiles:[]};db.prepare('INSERT INTO topologies VALUES(?,?,1,?)').run('main',JSON.stringify(data),new Date().toISOString());rows=db.prepare('SELECT * FROM topologies').all();}
+   const active=String(rows[0].id);db.prepare('INSERT INTO network_workspace VALUES(1,?)').run(active);
+   for(const row of rows){const data=JSON.parse(row.data);db.prepare('INSERT INTO topology_versions VALUES(?,?,?,?,?)').run(randomUUID(),active,row.id===active?'Начальная версия':'Прежняя схема: '+data.name,row.data,row.updated_at);}
+   db.exec('COMMIT');return active;
+  }catch(e){db.exec('ROLLBACK');throw e;}
+ }
+ function snapshot(id,label,data){const versionId=randomUUID(),createdAt=new Date().toISOString();db.prepare('INSERT INTO topology_versions VALUES(?,?,?,?,?)').run(versionId,id,label,data,createdAt);return {id:versionId,label,createdAt};}
+ function conflict(){const e=new Error('Сеть изменилась в другой вкладке. Перезагрузите страницу.');e.code='CONFLICT';return e;}
  return {
+  currentId,
+  versions(){const id=currentId();return db.prepare('SELECT id,label,created_at AS createdAt FROM topology_versions WHERE workspace_id=? ORDER BY created_at DESC,rowid DESC').all(id);},
+  createVersion(label,revision){const id=currentId();db.exec('BEGIN IMMEDIATE');try{const row=db.prepare('SELECT data,revision FROM topologies WHERE id=?').get(id);if(Number(row.revision)!==revision)throw conflict();const result=snapshot(id,label,row.data);db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}},
+  restoreVersion(versionId,revision){const id=currentId();db.exec('BEGIN IMMEDIATE');try{const row=db.prepare('SELECT data,revision FROM topologies WHERE id=?').get(id);if(Number(row.revision)!==revision)throw conflict();const version=db.prepare('SELECT data,label FROM topology_versions WHERE id=? AND workspace_id=?').get(versionId,id);if(!version){const e=new Error('Версия не найдена');e.code='NOT_FOUND';throw e;}snapshot(id,'Перед восстановлением: '+version.label,row.data);const next=Number(row.revision)+1;db.prepare('UPDATE topologies SET data=?,revision=?,updated_at=? WHERE id=?').run(version.data,next,new Date().toISOString(),id);db.exec('COMMIT');return {revision:next};}catch(e){db.exec('ROLLBACK');throw e;}},
   read(id='main'){const row=db.prepare('SELECT data,revision FROM topologies WHERE id=?').get(id);if(!row)return null;const data=JSON.parse(row.data);return normalizeWifiGraph({...data,description:data.description??'',nodes:data.nodes.map(normalizeNode),revision:Number(row.revision)});},
   list(){return db.prepare('SELECT id,data,updated_at FROM topologies ORDER BY updated_at DESC,id').all().map(r=>{const d=JSON.parse(r.data);return {id:r.id,name:d.name,description:d.description??'',nodes:d.nodes.length,links:d.links.length,updatedAt:r.updated_at};});},
   create(name,description=''){const id=randomUUID();db.prepare('INSERT INTO topologies VALUES(?,?,1,?)').run(id,JSON.stringify({schemaVersion:1,name,description,nodes:[],links:[]}),new Date().toISOString());return {id};},

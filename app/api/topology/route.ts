@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(req:Request) {
   const denied=requireAuth(req);if(denied)return denied;
-  try { return Response.json(getStore().read(new URL(req.url).searchParams.get('id')||'main'), {headers:{'Cache-Control':'no-store'}}); }
+  try { return Response.json(getStore().read(getStore().currentId()), {headers:{'Cache-Control':'no-store'}}); }
   catch (error) { console.error('Database read failed', error); return Response.json({error:'База данных недоступна'},{status:500}); }
 }
 export async function PUT(req: Request) {
@@ -40,9 +40,9 @@ export async function PUT(req: Request) {
       if(l.comment!==undefined&&typeof l.comment!=='string') throw Error();
       links.add(l.id);
     }
-    validateOptions(data);
+    validateOptions(data,{requireWifiNetwork:true});
   } catch { return Response.json({error:'Некорректная схема'},{status:400}); }
-  try { return Response.json(getStore().save(data,new URL(req.url).searchParams.get('id')||'main')); }
+  try { return Response.json(getStore().save(data,getStore().currentId())); }
   catch (error) {
     if ((error as {code?:string}).code==='NOT_FOUND')return Response.json({error:'Схема удалена'},{status:404});
     if ((error as {code?:string}).code==='CONFLICT') return Response.json({error:(error as Error).message},{status:409});

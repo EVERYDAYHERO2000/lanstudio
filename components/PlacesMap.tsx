@@ -1,0 +1,11 @@
+'use client';
+import {useEffect,useRef} from 'react';
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import type {Place} from './Places';
+export default function PlacesMap({places,selected,onSelect,onLocate}:{places:Place[];selected:string;onSelect:(id:string)=>void;onLocate:(id:string,latitude:number,longitude:number)=>void}){
+ const element=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),markers=useRef<L.LayerGroup|null>(null),latest=useRef({selected,onSelect,onLocate}),fitted=useRef(false);latest.current={selected,onSelect,onLocate};
+ useEffect(()=>{if(!element.current)return;const m=L.map(element.current).setView([0,0],2);map.current=m;L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(m);markers.current=L.layerGroup().addTo(m);m.on('click',(e:L.LeafletMouseEvent)=>{if(latest.current.selected)latest.current.onLocate(latest.current.selected,Number(e.latlng.lat.toFixed(6)),Number(e.latlng.wrap().lng.toFixed(6)));});const resize=new ResizeObserver(()=>m.invalidateSize());resize.observe(element.current);return()=>{resize.disconnect();m.remove();map.current=null;};},[]);
+ useEffect(()=>{const m=map.current,group=markers.current;if(!m||!group)return;group.clearLayers();const points:L.LatLngTuple[]=[];for(const p of places){if(!Number.isFinite(p.latitude)||!Number.isFinite(p.longitude))continue;const position:L.LatLngTuple=[p.latitude!,p.longitude!];points.push(position);const marker=L.marker(position,{draggable:true,bubblingMouseEvents:false,icon:L.divIcon({className:'place-map-marker'+(selected===p.id?' selected':''),html:'<span></span>',iconSize:[20,20],iconAnchor:[10,10]})}).addTo(group);const label=document.createElement('span');label.textContent=p.name;marker.bindTooltip(label);marker.on('click',()=>latest.current.onSelect(p.id));marker.on('dragend',()=>{const at=marker.getLatLng().wrap();latest.current.onLocate(p.id,Number(at.lat.toFixed(6)),Number(at.lng.toFixed(6)));});}if(points.length&&!fitted.current){m.fitBounds(L.latLngBounds(points).pad(.2),{maxZoom:16});fitted.current=true;}},[places,selected]);
+ return <div className="places-map" ref={element} aria-label="Карта физических мест"/>;
+}

@@ -1,0 +1,5 @@
+import {getStore} from '../../../db';
+import {requireAuth} from '../../../lib/auth';
+export const dynamic='force-dynamic';
+export async function GET(req:Request){return requireAuth(req)??Response.json(getStore().versions(),{headers:{'Cache-Control':'no-store'}});}
+export async function POST(req:Request){const denied=requireAuth(req);if(denied)return denied;try{const body=await req.json();if(!Number.isInteger(body.revision)||body.revision<1)return Response.json({error:'Укажите текущую версию записи'},{status:400});if(body.action==='restore'){if(typeof body.id!=='string')throw Error('Укажите версию');return Response.json(getStore().restoreVersion(body.id,body.revision));}if(body.action!=='create'||typeof body.label!=='string'||!body.label.trim()||body.label.length>200)throw Error('Укажите название версии (до 200 символов)');return Response.json(getStore().createVersion(body.label.trim(),body.revision),{status:201});}catch(e){const error=e as Error&{code?:string};return Response.json({error:error.message||'Не удалось выполнить действие'},{status:error.code==='CONFLICT'?409:error.code==='NOT_FOUND'?404:400});}}
